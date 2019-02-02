@@ -1,0 +1,19 @@
+#! /bin/bash
+
+rss_raw=$(kubectl get rs --all-namespaces -o json)
+
+IFS=$'\n'
+for rs in $(echo "$rss_raw" | jq -r '.items[].metadata | "\(.namespace) \(.name)"')
+do
+  IFS=$' '
+  read namespace name <<<$(echo "$rs")
+  echo "namespace: $namespace name: $name"
+  ownerFound=$(echo "$rss_raw" | jq -r --arg namespace "$namespace" --arg name "$name" '.items[] | select(.metadata.namespace==$namespace and .metadata.name==$name) | .metadata.ownerReferences?!=null and (.metadata.ownerReferences | length > 0)')
+  if [ "$ownerFound" == "true" ]
+  then
+    #echo "    has owner"
+    :
+  else
+    kubectl -n $namespace delete rs $name;
+  fi
+done
